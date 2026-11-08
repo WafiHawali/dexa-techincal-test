@@ -1,0 +1,133 @@
+x-backend: &backend
+  image: dexa-backend:local
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: runtime
+  init: true
+  env_file: .env
+  environment: &backend-environment
+    DATABASE_URL: mysql://${MYSQL_USER:-dexa}:${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-dexa}
+    JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+    AUTH_HOST: auth-service
+    AUTH_PORT: "4001"
+    EMPLOYEE_HOST: employee-service
+    EMPLOYEE_PORT: "4002"
+    ATTENDANCE_HOST: attendance-service
+    ATTENDANCE_PORT: "4003"
+    FILE_HOST: file-service
+    FILE_PORT: "4004"
+    UPLOAD_DIR: /app/uploads
+    PORT: "3000"
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+  restart: unless-stopped
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-dexa}
+      MYSQL_USER: ${MYSQL_USER:-dexa}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --host=127.0.0.1 --user=\"$$MYSQL_USER\" --database=\"$$MYSQL_DATABASE\" --execute='SELECT 1' --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  migrate:
+    image: dexa-tooling:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER:-dexa}:${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-dexa}
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    image: dexa-tooling:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    profiles: ["seed"]
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER:-dexa}:${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-dexa}
+    command: ["npm", "run", "db:seed"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  auth-service:
+    <<: *backend
+    command: ["node", "apps/auth-service/dist/apps/auth-service/src/main.js"]
+
+  employee-service:
+    <<: *backend
+    command: ["node", "apps/employee-service/dist/apps/employee-service/src/main.js"]
+
+  attendance-service:
+    <<: *backend
+    command: ["node", "apps/attendance-service/dist/apps/attendance-service/src/main.js"]
+
+  file-service:
+    <<: *backend
+    command: ["node", "apps/file-service/dist/apps/file-service/src/main.js"]
+    volumes:
+      - uploads:/app/uploads
+
+  api-gateway:
+    <<: *backend
+    command: ["node", "apps/api-gateway/dist/apps/api-gateway/src/main.js"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      auth-service:
+        condition: service_started
+      employee-service:
+        condition: service_started
+      attendance-service:
+        condition: service_started
+      file-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 6s
+      retries: 20
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  uploads:

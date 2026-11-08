@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  EMPLOYEE
+  HRD
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AttendanceStatus {
+  PRESENT
+}
+
+// Employee Service owns this table. Cross-service references are scalar IDs only.
+model Employee {
+  id             Int            @id @default(autoincrement())
+  employeeNumber String         @unique @map("employee_number")
+  fullName       String         @map("full_name")
+  email          String         @unique
+  department     String?
+  position       String?
+  status         EmployeeStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("employees")
+}
+
+// Auth Service owns users; employee existence is checked through Employee RPC.
+model User {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int      @unique @map("employee_id")
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(EMPLOYEE)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+// Attendance Service owns attendances; no cross-owner cascades or foreign keys.
+model Attendance {
+  id             Int              @id @default(autoincrement())
+  employeeId     Int              @map("employee_id")
+  attendanceDate DateTime         @db.Date @map("attendance_date")
+  checkInAt      DateTime         @map("check_in_at")
+  status         AttendanceStatus @default(PRESENT)
+  latitude       Decimal?         @db.Decimal(10, 7)
+  longitude      Decimal?         @db.Decimal(10, 7)
+  gpsAccuracy    Float?           @map("gps_accuracy")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@unique([employeeId, attendanceDate])
+  @@index([attendanceDate, checkInAt])
+  @@map("attendances")
+}
+
+// File Service owns metadata and authorizes access through Attendance RPC.
+model AttendancePhoto {
+  id           Int      @id @default(autoincrement())
+  attendanceId Int      @map("attendance_id")
+  fileName     String   @map("file_name")
+  filePath     String   @map("file_path")
+  mimeType     String   @map("mime_type")
+  fileSize     Int      @map("file_size")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([attendanceId])
+  @@map("attendance_photos")
+}

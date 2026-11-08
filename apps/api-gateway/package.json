@@ -1,0 +1,4 @@
+{
+  "name": "@dexa/api-gateway", "version": "1.0.0", "private": true,
+  "scripts": {"build": "tsc -p tsconfig.json", "dev": "node --watch --require ts-node/register/transpile-only src/main.ts", "start": "node dist/apps/api-gateway/src/main.js"}
+}
