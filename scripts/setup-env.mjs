@@ -9,12 +9,12 @@ const values = {
   AUTH_HOST:'127.0.0.1', AUTH_PORT:'4001', EMPLOYEE_HOST:'127.0.0.1', EMPLOYEE_PORT:'4002',
   ATTENDANCE_HOST:'127.0.0.1', ATTENDANCE_PORT:'4003', FILE_HOST:'127.0.0.1', FILE_PORT:'4004',
   UPLOAD_DIR:'uploads', WEB_PORT:'8080',
-  SEED_HRD_EMAIL:'hrd@example.com', SEED_HRD_PASSWORD:secret(),
-  SEED_EMPLOYEE_EMAIL:'employee@example.com', SEED_EMPLOYEE_PASSWORD:secret(),
+  SEED_HRD_EMAIL:'hrd@example.com', SEED_HRD_PASSWORD:'hrd123456',
+  SEED_EMPLOYEE_EMAIL:'employee@example.com', SEED_EMPLOYEE_PASSWORD:'emp123456',
 };
 try {
   writeFileSync(new URL('../.env', import.meta.url), Object.entries(values).map(([key,value])=>`${key}=${value}`).join('\n')+'\n', {flag:'wx',mode:0o600});
-  console.info('Created .env with random local secrets. Seed emails: hrd@example.com and employee@example.com. Passwords are stored only in .env; inspect them locally.');
+  console.info('Created .env with random local secrets. Seed accounts: hrd@example.com / hrd123456 and employee@example.com / emp123456.');
 } catch(error) {
   if(error.code==='EEXIST') console.info('.env already exists; left unchanged.');
   else throw error;

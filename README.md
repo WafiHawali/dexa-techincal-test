@@ -36,7 +36,20 @@ npm run dev
 - Gateway: `http://localhost:3000/api`
 - Swagger: `http://localhost:3000/api/docs`
 
-Seed accounts are defined by `SEED_*` values in `.env`.
+### Seed accounts
+
+`npm run setup:env` writes these static credentials to `.env`, so no manual setup is needed:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| HRD | `hrd@example.com` | `hrd123456` |
+| Employee | `employee@example.com` | `emp123456` |
+
+The database connection is set by `DATABASE_URL` in `.env`, for example:
+
+```sh
+DATABASE_URL=mysql://USER:PASSWORD@HOST:3306/dexa
+```
 
 ## Docker
 

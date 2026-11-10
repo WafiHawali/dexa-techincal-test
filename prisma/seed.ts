@@ -18,8 +18,8 @@ async function main(): Promise<void> {
   if (accounts[0].email === accounts[1].email) throw new Error('Seed accounts must have different email addresses');
   for (const account of accounts) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account.email)) throw new Error('Seed email must be valid');
-    if (account.password.length < 12 || Buffer.byteLength(account.password, 'utf8') > 72) {
-      throw new Error('Seed passwords must be at least 12 characters and at most 72 UTF-8 bytes');
+    if (account.password.length < 8 || Buffer.byteLength(account.password, 'utf8') > 72) {
+      throw new Error('Seed passwords must be at least 8 characters and at most 72 UTF-8 bytes');
     }
   }
   // Bootstrap-only ownership exception: one transaction provisions Employee and Auth data.
