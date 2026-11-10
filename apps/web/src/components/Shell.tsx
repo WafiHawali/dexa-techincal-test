@@ -2,7 +2,7 @@ import { CalendarCheck, ClipboardList, LayoutDashboard, LogOut, Menu, UserRound,
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../lib/auth';
-import { formatDate, initials, todayJakarta } from '../lib/dates';
+import { initials } from '../lib/dates';
 
 const employeeLinks = [
   { to: '/employee/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -48,10 +48,10 @@ export function Shell() {
     <div className="lg:pl-72">
       <header className="flex h-20 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 sm:px-8">
         <div className="flex min-w-0 items-center gap-3"><button className="btn-icon lg:hidden" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}><Menu size={20} /></button><span className="truncate text-sm font-medium text-slate-700">{active?.label || 'Workspace'}</span></div>
-        <div className="flex items-center gap-4"><span className="hidden text-xs text-slate-600 md:block">{formatDate(todayJakarta())} <span className="ml-1 tabular-nums">WIB</span></span><Link to={isHrd ? '/hrd/dashboard' : '/employee/profile'} aria-label="My workspace" className="avatar h-9 w-9 text-xs">{initials(user?.employee?.fullName)}</Link></div>
+        <div className="flex items-center gap-4"><Link to={isHrd ? '/hrd/dashboard' : '/employee/profile'} aria-label="My workspace" className="avatar h-9 w-9 text-xs">{initials(user?.employee?.fullName)}</Link></div>
       </header>
       <main id="main-content" className="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 sm:py-9"><Outlet /></main>
-      <footer className="mx-auto flex max-w-[1480px] flex-wrap justify-between gap-2 px-5 pb-6 text-xs text-slate-600 sm:px-8"><span>© {new Date().getFullYear()} Attendance System</span><span>All attendance times are in Asia/Jakarta (WIB)</span></footer>
+      <footer className="mx-auto flex max-w-[1480px] flex-wrap justify-between gap-2 px-5 pb-6 text-xs text-slate-600 sm:px-8"><span>© {new Date().getFullYear()} Attendance System</span></footer>
     </div>
   </div>;
 }
