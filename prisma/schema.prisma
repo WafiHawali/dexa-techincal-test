@@ -21,6 +21,11 @@ enum AttendanceStatus {
   PRESENT
 }
 
+enum PhotoKind {
+  CHECK_IN
+  CHECK_OUT
+}
+
 // Employee Service owns this table. Cross-service references are scalar IDs only.
 model Employee {
   id             Int            @id @default(autoincrement())
@@ -54,10 +59,8 @@ model Attendance {
   employeeId     Int              @map("employee_id")
   attendanceDate DateTime         @db.Date @map("attendance_date")
   checkInAt      DateTime         @map("check_in_at")
+  checkOutAt     DateTime?        @map("check_out_at")
   status         AttendanceStatus @default(PRESENT)
-  latitude       Decimal?         @db.Decimal(10, 7)
-  longitude      Decimal?         @db.Decimal(10, 7)
-  gpsAccuracy    Float?           @map("gps_accuracy")
   createdAt      DateTime         @default(now()) @map("created_at")
 
   @@unique([employeeId, attendanceDate])
@@ -68,13 +71,15 @@ model Attendance {
 // File Service owns metadata and authorizes access through Attendance RPC.
 model AttendancePhoto {
   id           Int      @id @default(autoincrement())
-  attendanceId Int      @map("attendance_id")
-  fileName     String   @map("file_name")
+  attendanceId Int          @map("attendance_id")
+  kind         PhotoKind    @default(CHECK_IN) @map("kind")
+  fileName     String       @map("file_name")
   filePath     String   @map("file_path")
   mimeType     String   @map("mime_type")
   fileSize     Int      @map("file_size")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  @@unique([attendanceId, kind])
   @@index([attendanceId])
   @@map("attendance_photos")
 }

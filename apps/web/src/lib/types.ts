@@ -24,12 +24,10 @@ export interface Attendance {
   employeeId: string;
   attendanceDate: string;
   checkInAt: string;
+  checkOutAt: string | null;
   status: string;
-  latitude: number | string;
-  longitude: number | string;
-  gpsAccuracy: number | string | null;
   employee?: Employee;
-  photos?: { id: string; originalName?: string; mimeType?: string }[];
+  photos?: { id: string; kind?: 'CHECK_IN' | 'CHECK_OUT'; originalName?: string; fileName?: string; mimeType?: string }[];
 }
 
 export interface Page<T> {
@@ -40,7 +38,7 @@ export interface Page<T> {
 }
 
 export interface Envelope<T> { data: T }
-export interface LoginInput { email: string; password: string }
+export interface LoginInput { identifier: string; password: string }
 export interface LoginResult { accessToken: string; user: User }
 export interface EmployeeInput {
   employeeNumber: string;

@@ -48,7 +48,9 @@ test('filesystem lifecycle, metadata failure cleanup and read authorization', as
   const attendance = { send: () => of({ id: 42, employeeId: 7 }) } as unknown as ClientProxy;
   try {
     const service = new FileService(prisma, attendance);
-    const stored = await service.store({ attendanceId: 42, photo });
+    await assert.rejects(service.store({ attendanceId: 42, photo, kind: 'INVALID' }), (e) => rpcError(e).statusCode === 400);
+    const stored = await service.store({ attendanceId: 42, photo, kind: 'CHECK_OUT' });
+    assert.equal(stored.kind, 'CHECK_OUT');
     assert.equal('filePath' in stored, false);
     assert.match(stored.fileName, /^[0-9a-f-]{36}\.png$/);
     assert.deepEqual(await readFile(join(dir, stored.fileName)), png);

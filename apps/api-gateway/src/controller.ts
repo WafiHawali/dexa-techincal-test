@@ -1,16 +1,23 @@
-import { BadRequestException, Body, Controller, Get, Inject, Param, ParseIntPipe, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Param, ParseIntPipe, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { Response } from 'express';
 import { ATTENDANCE, AUTH, EMPLOYEE, FILE, MAX_PHOTO_BYTES, rpc } from '../../../packages/shared/src';
-import { AttendanceListDto, CheckInDto, CreateEmployeeDto, ListDto, LoginDto, UpdateEmployeeDto } from './dto';
+import { AttendanceListDto, CreateEmployeeDto, ListDto, LoginDto, UpdateEmployeeDto } from './dto';
 import { AuthenticatedRequest, LoginRateGuard, Public, Roles } from './security';
 
 function actorOf(req: AuthenticatedRequest) {
   const { id, employeeId, role } = req.user;
   return { id, employeeId, role };
+}
+
+function photoUpload(fields:number) {
+  return FileInterceptor('photo',{storage:memoryStorage(),limits:{fileSize:MAX_PHOTO_BYTES,files:1,fields,parts:fields+1},fileFilter:(_req,file,callback)=>{
+    const valid=(file.mimetype==='image/png' && /\.png$/i.test(file.originalname)) || (file.mimetype==='image/jpeg' && /\.jpe?g$/i.test(file.originalname));
+    callback(valid ? null : new BadRequestException('Only matching JPG, JPEG, or PNG images are accepted'),valid);
+  }});
 }
 
 @ApiTags('WFH attendance')
@@ -43,22 +50,30 @@ export class ApiController {
 
   @Roles('EMPLOYEE') @Get('attendances/me') @ApiOperation({summary:'Get only the current employee’s attendance history'})
   myAttendance(@Req() req:AuthenticatedRequest,@Query() query:AttendanceListDto) {return rpc(this.attendance,'attendance.mine',{actor:actorOf(req),query});}
-  @Roles('EMPLOYEE') @Post('attendances/check-in') @ApiOperation({summary:'Check in once per Jakarta day with photo and one-time GPS'})
+  @Roles('EMPLOYEE') @Post('attendances/check-in') @ApiOperation({summary:'Check in once per Jakarta day with a photo'})
   @ApiConsumes('multipart/form-data')
-  @ApiBody({schema:{type:'object',required:['photo','latitude','longitude'],additionalProperties:false,properties:{photo:{type:'string',format:'binary'},latitude:{type:'number',minimum:-90,maximum:90},longitude:{type:'number',minimum:-180,maximum:180},gpsAccuracy:{type:'number',minimum:0}}}})
+  @ApiBody({schema:{type:'object',required:['photo'],additionalProperties:false,properties:{photo:{type:'string',format:'binary'}}}})
   @ApiResponse({status:409,description:'Already checked in for this Jakarta date'})
   @ApiResponse({status:413,description:'Image exceeds 5 MiB'})
-  @UseInterceptors(FileInterceptor('photo',{storage:memoryStorage(),limits:{fileSize:MAX_PHOTO_BYTES,files:1,fields:3,parts:4},fileFilter:(_req,file,callback)=>{
-    const valid=(file.mimetype==='image/png' && /\.png$/i.test(file.originalname)) || (file.mimetype==='image/jpeg' && /\.jpe?g$/i.test(file.originalname));
-    callback(valid ? null : new BadRequestException('Only matching JPG, JPEG, or PNG images are accepted'),valid);
-  }}))
-  checkIn(@Req() req:AuthenticatedRequest,@Body() data:CheckInDto,@UploadedFile() photo?:Express.Multer.File) {
+  @UseInterceptors(photoUpload(0))
+  checkIn(@Req() req:AuthenticatedRequest,@UploadedFile() photo?:Express.Multer.File) {
     if(!photo) throw new BadRequestException('An attendance photo is required');
-    return rpc(this.attendance,'attendance.checkIn',{actor:actorOf(req),data,photo:{originalname:photo.originalname,mimetype:photo.mimetype,size:photo.size,buffer:photo.buffer.toString('base64')}});
+    return rpc(this.attendance,'attendance.checkIn',{actor:actorOf(req),photo:{originalname:photo.originalname,mimetype:photo.mimetype,size:photo.size,buffer:photo.buffer.toString('base64')}});
+  }
+  @Roles('EMPLOYEE') @Post('attendances/check-out') @HttpCode(200) @ApiOperation({summary:'Clock out once with a photo for today’s attendance'})
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({schema:{type:'object',required:['photo'],additionalProperties:false,properties:{photo:{type:'string',format:'binary'}}}})
+  @ApiResponse({status:404,description:'No check-in exists for the current Jakarta date'})
+  @ApiResponse({status:409,description:'Already checked out for today'})
+  @ApiResponse({status:413,description:'Image exceeds 5 MiB'})
+  @UseInterceptors(photoUpload(0))
+  checkOut(@Req() req:AuthenticatedRequest,@UploadedFile() photo?:Express.Multer.File) {
+    if(!photo) throw new BadRequestException('A clock-out photo is required');
+    return rpc(this.attendance,'attendance.checkOut',{actor:actorOf(req),photo:{originalname:photo.originalname,mimetype:photo.mimetype,size:photo.size,buffer:photo.buffer.toString('base64')}});
   }
   @Roles('HRD') @Get('attendances') @ApiOperation({summary:'Monitor attendance with date and employee search filters; read only'})
   listAttendance(@Req() req:AuthenticatedRequest,@Query() query:AttendanceListDto) {return rpc(this.attendance,'attendance.list',{actor:actorOf(req),query});}
-  @Roles('HRD') @Get('attendances/:id') @ApiOperation({summary:'View immutable attendance, GPS, employee, and photo metadata'})
+  @Roles('HRD') @Get('attendances/:id') @ApiOperation({summary:'View immutable attendance, employee, and photo metadata'})
   detail(@Req() req:AuthenticatedRequest,@Param('id',ParseIntPipe) id:number) {return rpc(this.attendance,'attendance.detail',{actor:actorOf(req),id});}
   @Get('files/:id') @ApiOperation({summary:'Download a photo as HRD or its owning employee'})
   @ApiResponse({status:200,description:'Private image bytes',content:{'image/png':{schema:{type:'string',format:'binary'}},'image/jpeg':{schema:{type:'string',format:'binary'}}}})

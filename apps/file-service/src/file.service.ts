@@ -7,9 +7,15 @@ import { resolve } from 'node:path';
 import { ATTENDANCE, fail, PrismaService, rpc } from '../../../packages/shared/src';
 import { actor, id, object, validatePhoto } from './validation';
 
+function photoKind(value: unknown): 'CHECK_IN' | 'CHECK_OUT' {
+  if (value === undefined || value === 'CHECK_IN') return 'CHECK_IN';
+  if (value === 'CHECK_OUT') return 'CHECK_OUT';
+  fail(400, 'Invalid photo kind');
+}
+
 function metadata(photo: AttendancePhoto) {
-  const { id, attendanceId, fileName, mimeType, fileSize, createdAt } = photo;
-  return { id, attendanceId, fileName, mimeType, fileSize, createdAt };
+  const { id, attendanceId, kind, fileName, mimeType, fileSize, createdAt } = photo;
+  return { id, attendanceId, kind, fileName, mimeType, fileSize, createdAt };
 }
 @Injectable()
 export class FileService {
@@ -38,8 +44,9 @@ export class FileService {
   }
 
   async store(value: unknown) {
-    const input = object(value, ['attendanceId', 'photo']);
+    const input = object(value, ['attendanceId', 'photo', 'kind']);
     const attendanceId = id(input.attendanceId);
+    const kind = photoKind(input.kind);
     const photo = validatePhoto(input.photo);
     await rpc(this.attendance, 'attendance.internalGet', { id: attendanceId });
     const fileName = `${randomUUID()}${photo.extension}`;
@@ -53,7 +60,7 @@ export class FileService {
       try { await handle.writeFile(photo.bytes); } finally { await handle.close(); }
       metadataAttempted = true;
       return metadata(await this.prisma.attendancePhoto.create({ data: {
-        attendanceId, fileName, filePath, mimeType: photo.mimeType, fileSize: photo.bytes.length,
+        attendanceId, kind, fileName, filePath, mimeType: photo.mimeType, fileSize: photo.bytes.length,
       } }));
     } catch {
       try {

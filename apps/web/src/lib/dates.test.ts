@@ -16,8 +16,8 @@ describe('Jakarta attendance dates', () => {
     expect(formatDate('2026-11-08')).toBe('8 Nov 2026');
   });
   it('handles absent or invalid timestamps', () => {
-    expect(formatTime()).toBe('—');
-    expect(formatTime('invalid')).toBe('—');
-    expect(formatDate('invalid')).toBe('—');
+    expect(formatTime()).toBe('Not set');
+    expect(formatTime('invalid')).toBe('Not set');
+    expect(formatDate('invalid')).toBe('Not set');
   });
 });

@@ -2,7 +2,7 @@ import { Controller, Inject } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { PrismaService } from '../../../packages/shared/src';
 import {
-  CreateInput, EmailInput, GetInput, IdInput, input, InternalListInput, ListInput, UpdateInput,
+  CreateInput, GetInput, IdInput, input, InternalListInput, ListInput, LoginIdentifierInput, UpdateInput,
 } from './employee.dto';
 import { EmployeeService } from './employee.service';
 
@@ -13,9 +13,9 @@ export class EmployeeController {
     @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
-  @MessagePattern('employee.findByEmail')
-  findByEmail(@Payload() payload: unknown) {
-    return this.employees.findByEmail(input(EmailInput, payload).email);
+  @MessagePattern('employee.findByLogin')
+  findByLogin(@Payload() payload: unknown) {
+    return this.employees.findByLogin(input(LoginIdentifierInput, payload).identifier);
   }
 
   @MessagePattern('employee.internalGet')

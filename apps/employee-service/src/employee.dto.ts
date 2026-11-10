@@ -45,11 +45,12 @@ export class GetInput extends AuthorizedInput {
   id!: number;
 }
 
-export class EmailInput {
-  @Transform(normalizeEmail)
-  @IsEmail()
+export class LoginIdentifierInput {
+  @Transform(normalize)
+  @IsString()
+  @MinLength(1)
   @MaxLength(191)
-  email!: string;
+  identifier!: string;
 }
 
 export class InternalListInput {

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
-  ClientProxy, ClientProxyFactory, ClientsModule, MicroserviceOptions,
+  ClientProxy, ClientsModule, MicroserviceOptions,
   RpcException, TcpClientOptions, Transport,
 } from '@nestjs/microservices';
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -140,10 +140,6 @@ export function rpcClientOptions(service: ServiceName): TcpClientOptions {
       port: portNumber(process.env[`${service}_PORT`], DEFAULT_PORTS[service]),
     },
   };
-}
-
-export function createRpcClient(service: ServiceName): ClientProxy {
-  return ClientProxyFactory.create(rpcClientOptions(service));
 }
 
 @Global()

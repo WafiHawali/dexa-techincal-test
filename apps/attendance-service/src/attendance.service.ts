@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { Attendance, Employee, Prisma } from '@prisma/client';
 import { Actor, EMPLOYEE, FILE, fail, jakartaDate, PrismaService, rpc, rpcError } from '../../../packages/shared/src';
-import { actor, coordinates, id, listQuery, object } from './validation';
+import { actor, id, listQuery, object } from './validation';
 
 interface PhotoMetadata { id: number; attendanceId: number; fileName: string; mimeType: string; fileSize: number; createdAt: string }
 @Injectable()
@@ -31,7 +31,7 @@ export class AttendanceService {
   }
 
   async checkIn(value: unknown) {
-    const input = object(value, ['actor', 'data', 'photo']);
+    const input = object(value, ['actor', 'photo']);
     const identity = actor(input.actor);
     if (identity.role !== 'EMPLOYEE') fail(403, 'Employee access required');
     const now = new Date();
@@ -40,7 +40,6 @@ export class AttendanceService {
       employeeId_attendanceDate: { employeeId: identity.employeeId, attendanceDate },
     } });
     if (existing) fail(409, 'Already checked in today');
-    const data = coordinates(input.data);
     const employee = await rpc<Employee>(this.employees, 'employee.internalGet', { id: identity.employeeId });
     if (employee.status !== 'ACTIVE') fail(403, 'Employee is inactive');
     await rpc(this.files, 'file.validate', { photo: input.photo });
@@ -48,14 +47,14 @@ export class AttendanceService {
     let attendance: Attendance;
     try {
       attendance = await this.prisma.attendance.create({ data: {
-        employeeId: identity.employeeId, attendanceDate, checkInAt: now, status: 'PRESENT', ...data,
+        employeeId: identity.employeeId, attendanceDate, checkInAt: now, status: 'PRESENT',
       } });
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') fail(409, 'Already checked in today');
       throw error;
     }
     try {
-      await rpc(this.files, 'file.store', { attendanceId: attendance.id, photo: input.photo });
+      await rpc(this.files, 'file.store', { attendanceId: attendance.id, photo: input.photo, kind: 'CHECK_IN' });
     } catch (error) {
       const status = rpcError(error).statusCode;
       if ([500, 503, 504].includes(status)) {
@@ -73,6 +72,45 @@ export class AttendanceService {
     }
     // Enrichment failures must not roll back an already finalized check-in.
     return (await this.enrich([attendance]))[0];
+  }
+
+  async checkOut(value: unknown) {
+    const input = object(value, ['actor', 'photo']);
+    const identity = actor(input.actor);
+    if (identity.role !== 'EMPLOYEE') fail(403, 'Employee access required');
+    const now = new Date();
+    const attendanceDate = jakartaDate(now);
+    const attendance = await this.prisma.attendance.findUnique({ where: {
+      employeeId_attendanceDate: { employeeId: identity.employeeId, attendanceDate },
+    } });
+    if (!attendance) fail(404, 'No check-in found for today');
+    if (attendance.checkOutAt) fail(409, 'Already checked out today');
+    await rpc(this.files, 'file.validate', { photo: input.photo });
+    // Conditional update makes concurrent clock-out requests single-winner.
+    const updated = await this.prisma.attendance.updateMany({
+      where: { id: attendance.id, checkOutAt: null },
+      data: { checkOutAt: now },
+    });
+    if (updated.count === 0) fail(409, 'Already checked out today');
+    try {
+      await rpc(this.files, 'file.store', { attendanceId: attendance.id, photo: input.photo, kind: 'CHECK_OUT' });
+    } catch (error) {
+      const status = rpcError(error).statusCode;
+      if ([500, 503, 504].includes(status)) {
+        this.logger.error(`Ambiguous clock-out photo outcome; preserve attendanceId=${attendance.id} for reconciliation`);
+      } else {
+        try {
+          await this.prisma.attendance.updateMany({
+            where: { id: attendance.id, checkOutAt: now },
+            data: { checkOutAt: null },
+          });
+        } catch {
+          this.logger.error(`Clock-out compensation incomplete; reconcile attendanceId=${attendance.id}`);
+        }
+      }
+      throw error;
+    }
+    return (await this.enrich([await this.internalGet(attendance.id)]))[0];
   }
 
   async list(value: unknown, mine = false) {

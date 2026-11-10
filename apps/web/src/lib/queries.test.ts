@@ -4,8 +4,8 @@ import { loadOwnOverview } from './queries';
 import type { Attendance } from './types';
 
 const attendance = (date: string, id: string): Attendance => ({
-  id, employeeId: 'employee-1', attendanceDate: date, checkInAt: `${date}T01:00:00.000Z`,
-  status: 'PRESENT', latitude: 0, longitude: 0, gpsAccuracy: 10,
+  id, employeeId: 'employee-1', attendanceDate: date, checkInAt: `${date}T01:00:00.000Z`, checkOutAt: null,
+  status: 'PRESENT',
 });
 
 afterEach(() => vi.restoreAllMocks());

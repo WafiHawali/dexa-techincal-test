@@ -12,6 +12,9 @@ export class AttendanceController {
   @MessagePattern('attendance.checkIn')
   checkIn(@Payload() payload: unknown) { return this.service.checkIn(payload); }
 
+  @MessagePattern('attendance.checkOut')
+  checkOut(@Payload() payload: unknown) { return this.service.checkOut(payload); }
+
   @MessagePattern('attendance.list')
   list(@Payload() payload: unknown) { return this.service.list(payload); }
 

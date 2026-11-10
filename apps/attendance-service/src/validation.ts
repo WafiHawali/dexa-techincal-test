@@ -19,17 +19,6 @@ export function actor(value: unknown): Actor {
   return input as unknown as Actor;
 }
 
-export interface Coordinates { latitude: number; longitude: number; gpsAccuracy?: number }
-export function coordinates(value: unknown): Coordinates {
-  const data = object(value, ['latitude', 'longitude', 'gpsAccuracy']);
-  for (const [key, min, max] of [['latitude', -90, 90], ['longitude', -180, 180], ['gpsAccuracy', 0, Number.MAX_VALUE]] as const) {
-    const n = data[key];
-    if (key === 'gpsAccuracy' && n === undefined) continue;
-    if (typeof n !== 'number' || !Number.isFinite(n) || n < min || n > max) fail(400, `Invalid ${key}`);
-  }
-  return data as unknown as Coordinates;
-}
-
 export interface ListQuery { page: number; pageSize: number; search?: string; date?: string }
 export function listQuery(value: unknown = {}): ListQuery {
   const query = object(value, ['page', 'pageSize', 'search', 'date']);

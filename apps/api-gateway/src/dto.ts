@@ -1,9 +1,9 @@
-import { Transform, Type } from 'class-transformer';
-import { IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEmail, IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
 export class LoginDto {
-  @ApiProperty({example:'employee@example.com'}) @IsEmail() @MaxLength(191) email!: string;
+  @ApiProperty({example:'employee@example.com or SEED-EMPLOYEE'}) @IsString() @MinLength(1) @MaxLength(191) identifier!: string;
   @ApiProperty({format:'password'}) @IsString() @MinLength(1) @MaxLength(72) password!: string;
 }
 export class CreateEmployeeDto {
@@ -24,10 +24,4 @@ export class ListDto {
 }
 export class AttendanceListDto extends ListDto {
   @ApiPropertyOptional({example:'2026-11-08'}) @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) date?: string;
-}
-const numeric = ({ value }: {value:unknown}) => typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
-export class CheckInDto {
-  @ApiProperty({minimum:-90,maximum:90}) @Transform(numeric) @IsNumber({allowNaN:false,allowInfinity:false}) @Min(-90) @Max(90) latitude!: number;
-  @ApiProperty({minimum:-180,maximum:180}) @Transform(numeric) @IsNumber({allowNaN:false,allowInfinity:false}) @Min(-180) @Max(180) longitude!: number;
-  @ApiPropertyOptional({minimum:0}) @IsOptional() @Transform(numeric) @IsNumber({allowNaN:false,allowInfinity:false}) @Min(0) gpsAccuracy?: number;
 }

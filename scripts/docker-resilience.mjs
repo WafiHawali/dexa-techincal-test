@@ -23,7 +23,7 @@ async function healthy() {
 }
 try {
   await healthy();
-  const login=await request('/auth/login',{body:{email:process.env.SEED_HRD_EMAIL,password:process.env.SEED_HRD_PASSWORD},status:201});
+  const login=await request('/auth/login',{body:{identifier:process.env.SEED_HRD_EMAIL,password:process.env.SEED_HRD_PASSWORD},status:201});
   const token=login.accessToken;
   const list=await request('/attendances?pageSize=1',{token});
   const row=list.items[0];assert.ok(row?.photos?.[0],'Run integration against Docker before resilience checks');

@@ -32,13 +32,13 @@ function Home() {
 
 function NotFound() {
   const { user } = useAuth();
-  return <div className="grid min-h-screen place-items-center bg-slate-50 p-6"><Card className="w-full max-w-lg p-10 text-center"><p className="text-sm font-semibold tracking-widest text-brand-600">404 · PAGE NOT FOUND</p><h1 className="mt-4 text-2xl font-semibold text-ink">This page isn’t in your workspace.</h1><p className="mt-3 text-sm leading-6 text-slate-500">The link may be incorrect, or the page may have moved.</p><Link to={user ? homeFor(user) : '/login'} className="btn-primary mt-7"><ArrowLeft size={16} />Back to workspace</Link></Card></div>;
+  return <div className="grid min-h-screen place-items-center bg-slate-50 p-6"><Card className="w-full max-w-lg p-10 text-center"><p className="text-sm font-semibold text-brand-700">404. Page not found</p><h1 className="mt-4 text-2xl font-semibold text-ink">This page isn’t in your workspace.</h1><p className="mt-3 text-sm leading-6 text-slate-600">The link may be incorrect, or the page may have moved.</p><Link to={user ? homeFor(user) : '/login'} className="btn-primary mt-7"><ArrowLeft size={16} />Back to workspace</Link></Card></div>;
 }
 
 export function App() {
   const { restoring, restoreError, retry, logout } = useAuth();
   if (restoring) return <div className="grid min-h-screen place-items-center bg-slate-50"><Loading label="Verifying your session…" /></div>;
-  if (restoreError) return <div className="grid min-h-screen place-items-center bg-slate-50 p-6"><Card className="w-full max-w-lg space-y-5 p-8"><h1 className="text-xl font-semibold text-ink">We couldn’t verify your session</h1><p className="text-sm leading-6 text-slate-500">Your saved session must be validated before you can access your workspace.</p><ErrorPanel error={new Error(restoreError)} /><div className="flex flex-wrap gap-3"><button className="btn-primary" onClick={retry}><RefreshCw size={16} />Try again</button><button className="btn-secondary" onClick={logout}>Return to sign in</button></div></Card></div>;
+  if (restoreError) return <div className="grid min-h-screen place-items-center bg-slate-50 p-6"><Card className="w-full max-w-lg space-y-5 p-8"><h1 className="text-xl font-semibold text-ink">We couldn’t verify your session</h1><p className="text-sm leading-6 text-slate-600">Your saved session must be validated before you can access your workspace.</p><ErrorPanel error={new Error(restoreError)} /><div className="flex flex-wrap gap-3"><button className="btn-primary" onClick={retry}><RefreshCw size={16} />Try again</button><button className="btn-secondary" onClick={logout}>Return to sign in</button></div></Card></div>;
   return <Suspense fallback={<Loading label="Opening your workspace…" />}><Routes>
     <Route path="/" element={<Home />} />
     <Route path="/login" element={<Login />} />
@@ -67,7 +67,7 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, { faile
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error: Error, info: ErrorInfo) { console.error('Workplace rendering error', error, info.componentStack); }
   render() {
-    if (this.state.failed) return <div className="grid min-h-screen place-items-center bg-slate-50 p-6"><Card className="max-w-lg p-8 text-center"><h1 className="text-xl font-semibold text-ink">Your workspace encountered a problem</h1><p className="mt-3 text-sm text-slate-500">Reload the page to try again. If this keeps happening, contact your administrator.</p><button className="btn-primary mt-6" onClick={() => window.location.reload()}><RefreshCw size={16} />Reload workspace</button></Card></div>;
+    if (this.state.failed) return <div className="grid min-h-screen place-items-center bg-slate-50 p-6"><Card className="max-w-lg p-8 text-center"><h1 className="text-xl font-semibold text-ink">Your workspace encountered a problem</h1><p className="mt-3 text-sm text-slate-600">Reload the page to try again. If this keeps happening, contact your administrator.</p><button className="btn-primary mt-6" onClick={() => window.location.reload()}><RefreshCw size={16} />Reload workspace</button></Card></div>;
     return this.props.children;
   }
 }

@@ -26,14 +26,14 @@ export class AuthService implements OnModuleInit {
     this.dummyHash = await bcrypt.hash('not-an-account-password', 12);
   }
 
-  async login({ email, password }: LoginInput): Promise<{ accessToken: string; user: AuthUser }> {
-    const employee = await rpc<Employee | null>(this.employees, 'employee.findByEmail', { email });
+  async login({ identifier, password }: LoginInput): Promise<{ accessToken: string; user: AuthUser }> {
+    const employee = await rpc<Employee | null>(this.employees, 'employee.findByLogin', { identifier });
     const account = employee ? await this.prisma.user.findUnique({
       where: { employeeId: employee.id },
       select: { ...userSelect, passwordHash: true },
     }) : null;
     const matches = await bcrypt.compare(password, account?.passwordHash ?? this.dummyHash);
-    if (!account || !employee || !matches || employee.status !== 'ACTIVE') fail(401, 'Invalid email or password');
+    if (!account || !employee || !matches || employee.status !== 'ACTIVE') fail(401, 'Invalid credentials');
     const user: AuthUser = {
       id: account.id, employeeId: account.employeeId, role: account.role, employee,
     };

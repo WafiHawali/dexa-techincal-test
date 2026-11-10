@@ -1,14 +1,15 @@
 import { plainToInstance, Transform } from 'class-transformer';
 import {
-  IsEmail, IsInt, IsString, Max, MaxLength, Min, MinLength, validateSync,
+  IsInt, IsString, Max, MaxLength, Min, MinLength, validateSync,
 } from 'class-validator';
 import { fail } from '../../../packages/shared/src';
 
 export class LoginInput {
-  @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
-  @IsEmail()
+  @Transform(({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value)
+  @IsString()
+  @MinLength(1)
   @MaxLength(191)
-  email!: string;
+  identifier!: string;
 
   @IsString()
   @MinLength(1)

@@ -21,8 +21,11 @@ export class EmployeeService {
     return search ? { OR: [{ fullName: { contains: search } }, { employeeNumber: { contains: search } }] } : {};
   }
 
-  async findByEmail(email: string): Promise<Employee | null> {
-    return this.prisma.employee.findUnique({ where: { email: email.trim().toLowerCase() } });
+  async findByLogin(identifier: string): Promise<Employee | null> {
+    const value = identifier.trim();
+    return this.prisma.employee.findFirst({
+      where: { OR: [{ email: value.toLowerCase() }, { employeeNumber: value }] },
+    });
   }
 
   async internalGet(id: number): Promise<Employee> {

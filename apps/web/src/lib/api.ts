@@ -54,6 +54,7 @@ export const attendanceApi = {
     (await api.get<Envelope<Page<Attendance>>>('/attendances', { params })).data.data,
   get: async (id: string) => (await api.get<Envelope<Attendance>>(`/attendances/${encodeURIComponent(id)}`)).data.data,
   checkIn: async (data: FormData) => (await api.post<Envelope<Attendance>>('/attendances/check-in', data)).data.data,
+  checkOut: async (data: FormData) => (await api.post<Envelope<Attendance>>('/attendances/check-out', data)).data.data,
   photo: async (id: string, signal?: AbortSignal) =>
     (await api.get<Blob>(`/files/${encodeURIComponent(id)}`, { responseType: 'blob', signal })).data,
 };

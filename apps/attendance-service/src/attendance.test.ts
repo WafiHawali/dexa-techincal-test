@@ -4,7 +4,7 @@ import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { of, throwError } from 'rxjs';
 import { jakartaDate, PrismaService, rpcError } from '../../../packages/shared/src';
 import { AttendanceService } from './attendance.service';
-import { coordinates, listQuery } from './validation';
+import { listQuery } from './validation';
 
 const actor = { id: 1, employeeId: 7, role: 'EMPLOYEE' };
 const row = { id: 42, employeeId: 7 };
@@ -35,11 +35,56 @@ function fixture(options: { duplicate?: boolean; race?: boolean; storeStatus?: n
   } } as unknown as ClientProxy;
   return { service: new AttendanceService(prisma, employees, files), events };
 }
-const input = { actor, data: { latitude: -6.2, longitude: 106.8, gpsAccuracy: 10 }, photo: {} };
+const input = { actor, photo: {} };
 
-test('GPS validation rejects non-finite, missing, out of range and request timestamps', () => {
-  assert.deepEqual(coordinates({ latitude: -90, longitude: 180, gpsAccuracy: 0 }), { latitude: -90, longitude: 180, gpsAccuracy: 0 });
-  for (const data of [{ latitude: NaN, longitude: 0 }, { latitude: 0, longitude: Infinity }, { latitude: 91, longitude: 0 }, { latitude: 0 }, { latitude: 0, longitude: 0, gpsAccuracy: -1 }, { latitude: 0, longitude: 0, checkInAt: 'forged' }]) assert.throws(() => coordinates(data));
+const checkoutInput = { actor, photo: {} };
+function checkoutFixture(options: { existing?: boolean; checkedOut?: boolean; updateCount?: number; storeStatus?: number } = {}) {
+  const events: string[] = [];
+  let current = options.existing === false ? null : {
+    id: 42, employeeId: 7, checkInAt: new Date('2026-11-09T01:00:00Z'),
+    checkOutAt: options.checkedOut ? new Date('2026-11-09T10:00:00Z') : null,
+  };
+  const prisma = { attendance: {
+    findUnique: async (args: any) => {
+      events.push(args.where.id ? 'internalGet' : 'findToday');
+      if (!args.where.id) {
+        assert.equal(args.where.employeeId_attendanceDate.employeeId, 7);
+        assert.ok(args.where.employeeId_attendanceDate.attendanceDate instanceof Date);
+      }
+      return current;
+    },
+    updateMany: async ({ where, data }: any) => {
+      events.push('updateMany');
+      assert.equal(where.id, 42);
+      if (where.checkOutAt === null) {
+        assert.ok(data.checkOutAt instanceof Date);
+        if (options.updateCount === 0) return { count: 0 };
+        current = { ...current!, checkOutAt: data.checkOutAt };
+        return { count: 1 };
+      }
+      assert.ok(where.checkOutAt instanceof Date);
+      assert.equal(data.checkOutAt, null);
+      current = { ...current!, checkOutAt: null };
+      return { count: 1 };
+    },
+  } } as unknown as PrismaService;
+  const employees = { send: (pattern: string) => { events.push(pattern); return of([{ id: 7 }]); } } as unknown as ClientProxy;
+  const files = { send: (pattern: string, payload: any) => {
+    events.push(pattern);
+    if (pattern === 'file.store' && options.storeStatus) return throwError(() => ({ statusCode: options.storeStatus, message: 'storage failed' }));
+    if (pattern === 'file.store') { assert.equal(payload.kind, 'CHECK_OUT'); return of({ id: 9, attendanceId: 42, kind: 'CHECK_OUT' }); }
+    if (pattern === 'file.list') return of([{ id: 9, attendanceId: 42, kind: 'CHECK_OUT' }]);
+    return of({ valid: true });
+  } } as unknown as ClientProxy;
+  return { service: new AttendanceService(prisma, employees, files), events };
+}
+
+test('check-in rejects client-supplied coordinates or timestamps', async () => {
+  const { service, events } = fixture();
+  for (const extra of [{ data: { latitude: 0, longitude: 0 } }, { checkInAt: 'forged' }, { latitude: 0 }]) {
+    await assert.rejects(service.checkIn({ ...input, ...extra }), (e) => rpcError(e).statusCode === 400);
+  }
+  assert.deepEqual(events, []);
 });
 test('dates require exact, real YYYY-MM-DD; pagination is bounded', () => {
   assert.equal(listQuery({ date: '2024-02-29', page: '2', pageSize: '10' }).page, 2);
@@ -91,6 +136,41 @@ test('ambiguous timeout does not remove finalized file or attendance', async () 
   await assert.rejects(service.checkIn(input), (e) => rpcError(e).statusCode === 504);
   assert.equal(events.includes('file.removeForAttendance'), false);
   assert.equal(events.includes('delete'), false);
+});
+test('clock-out validates and stores the photo after claiming the server timestamp', async () => {
+  const { service, events } = checkoutFixture();
+  const result = await service.checkOut(checkoutInput);
+  assert.deepEqual(events, ['findToday', 'file.validate', 'updateMany', 'file.store', 'internalGet', 'employee.internalList', 'file.list']);
+  assert.ok(result.checkOutAt instanceof Date);
+  assert.equal(result.employee?.id, 7);
+});
+test('clock-out requires today’s check-in and rejects a second clock-out', async () => {
+  const missing = checkoutFixture({ existing: false });
+  await assert.rejects(missing.service.checkOut(checkoutInput), (e) => rpcError(e).statusCode === 404);
+  assert.deepEqual(missing.events, ['findToday']);
+  const duplicate = checkoutFixture({ checkedOut: true });
+  await assert.rejects(duplicate.service.checkOut(checkoutInput), (e) => rpcError(e).statusCode === 409);
+  assert.deepEqual(duplicate.events, ['findToday']);
+});
+test('concurrent clock-out is single-winner', async () => {
+  const { service, events } = checkoutFixture({ updateCount: 0 });
+  await assert.rejects(service.checkOut(checkoutInput), (e) => rpcError(e).statusCode === 409);
+  assert.deepEqual(events, ['findToday', 'file.validate', 'updateMany']);
+});
+test('clock-out storage failure rolls back the checkout timestamp', async () => {
+  const { service, events } = checkoutFixture({ storeStatus: 507 });
+  await assert.rejects(service.checkOut(checkoutInput), RpcException);
+  assert.deepEqual(events, ['findToday', 'file.validate', 'updateMany', 'file.store', 'updateMany']);
+});
+test('ambiguous clock-out storage failure preserves the timestamp for reconciliation', async () => {
+  const { service, events } = checkoutFixture({ storeStatus: 504 });
+  await assert.rejects(service.checkOut(checkoutInput), (e) => rpcError(e).statusCode === 504);
+  assert.deepEqual(events, ['findToday', 'file.validate', 'updateMany', 'file.store']);
+});
+test('HRD cannot clock out', async () => {
+  const { service, events } = checkoutFixture();
+  await assert.rejects(service.checkOut({ actor: { ...actor, role: 'HRD' }, photo: {} }), (e) => rpcError(e).statusCode === 403);
+  assert.deepEqual(events, []);
 });
 test('search and mine intersect employee IDs and date before pagination', async () => {
   let filter: any;
